@@ -1,28 +1,22 @@
-from selenium import webdriver
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.by import By
-import time
+*** Settings ***
+Library    SeleniumLibrary
 
-# Set up the WebDriver (Chrome in this example)
-driver = webdriver.Chrome()
+*** Variables ***
+${BROWSER}    Chrome
+${URL}        https://www.google.com
+${SEARCH_TERM}    Amazon
 
-try:
-    # Open Google
-    driver.get("https://www.google.com")
+*** Test Cases ***
+Google Search And Capture Report
+    [Documentation]    Perform a Google search and capture a report with title and screenshot.
+    Open Browser    ${URL}    ${BROWSER}
+    Maximize Browser Window
+    Wait Until Element Is Visible    name:q    10
+    Input Text    name:q    ${SEARCH_TERM}
+    Press Keys    name:q    ENTER
+    Wait Until Element Is Visible    id:search    10
+    Capture Page Screenshot    search_results.png
+    ${title}=    Get Title
+    Log    The page title is: ${title}
+    Close Browser
 
-    # Use WebDriverWait to wait for the search box to be present
-    wait = WebDriverWait(driver, 10)  # Wait up to 10 seconds
-    search_box = wait.until(EC.presence_of_element_located((By.NAME, "q")))
-
-    # Enter "Amazon" and submit the search
-    search_box.send_keys("Amazon")
-    search_box.send_keys(Keys.RETURN)
-
-    # Wait for search results to be visible
-    wait.until(EC.presence_of_element_located((By.ID, "search")))
-
-finally:
-    # Close the browser
-    driver.quit()
