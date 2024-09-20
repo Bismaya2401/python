@@ -1,21 +1,24 @@
+import logging
+import pytest
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-import logging
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+@pytest.fixture(scope="class")
+def setup_method(request):
+    driver = webdriver.Chrome()  # Initialize the WebDriver
+    driver.get("http://the-internet.herokuapp.com/login")  # Load the login page
+    request.cls.driver = driver
+    yield
+    driver.quit()  # Close the browser after tests
+
+@pytest.mark.usefixtures("setup_method")
 class TestLogin:
-    def setup_method(self):
-        self.driver = webdriver.Chrome()  # Initialize the WebDriver
-        self.driver.get("http://the-internet.herokuapp.com/login")  # Load the login page
-
-    def teardown_method(self):
-        self.driver.quit()  # Close the browser after each test
-
     def test_valid_login(self):
         logger.info("Entering valid username and password.")
         self.driver.find_element(By.ID, "username").send_keys("tomsmith")
@@ -40,12 +43,6 @@ class TestLogin:
         )
         assert "Your username is invalid!" in self.driver.page_source, "Error message not displayed!"
 
-# Run the tests
+# Run the tests using pytest
 if __name__ == "__main__":
-    test = TestLogin()
-    test.setup_method()
-    try:
-        test.test_valid_login()
-        test.test_invalid_login()
-    finally:
-        test.teardown_method()
+    pytest.main()
