@@ -1,47 +1,51 @@
-import logging
-import pytest
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+import logging
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("xyz")
+logger = logging.getLogger(__name__)
 
-@pytest.fixture
-def setup():
-    # Set up WebDriver
-    driver = webdriver.Chrome()
-    yield driver
-    driver.quit()
+class TestLogin:
+    def setup_method(self):
+        self.driver = webdriver.Chrome()  # Initialize the WebDriver
+        self.driver.get("http://the-internet.herokuapp.com/login")  # Load the login page
 
-def test_valid_login(setup):
-    driver = setup
-    driver.get("http://the-internet.herokuapp.com/login")  # Navigate to login page
-    
-    wait = WebDriverWait(driver, 10)
-    wait.until(EC.presence_of_element_located((By.ID, "username")))  # Wait for username field
+    def teardown_method(self):
+        self.driver.quit()  # Close the browser after each test
 
-    logger.info("Entering valid username and password.")
-    driver.find_element(By.ID, "username").send_keys("tomsmith")
-    driver.find_element(By.ID, "password").send_keys("SuperSecretPassword!")
-    driver.find_element(By.CSS_SELECTOR, "button[type='submit']").click()
+    def test_valid_login(self):
+        logger.info("Entering valid username and password.")
+        self.driver.find_element(By.ID, "username").send_keys("tomsmith")
+        self.driver.find_element(By.ID, "password").send_keys("SuperSecretPassword!")
+        self.driver.find_element(By.CSS_SELECTOR, "button[type='submit']").click()
+        
+        # Wait for the "Secure Area" header to be present after login
+        WebDriverWait(self.driver, 10).until(
+            EC.presence_of_element_located((By.TAG_NAME, "h2"))
+        )
+        assert "Secure Area" in self.driver.page_source, "Login failed! Secure Area not found."
 
-    wait.until(EC.presence_of_element_located((By.XPATH, "//h2[text()='Secure Area']")))  # Wait for successful login
-    assert "Secure Area" in driver.page_source, "Login failed!"  # Check if login is successful
+    def test_invalid_login(self):
+        logger.info("Entering invalid username and password.")
+        self.driver.find_element(By.ID, "username").send_keys("invalid_user")
+        self.driver.find_element(By.ID, "password").send_keys("invalid_password")
+        self.driver.find_element(By.CSS_SELECTOR, "button[type='submit']").click()
+        
+        # Wait for the error message to be displayed
+        WebDriverWait(self.driver, 10).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "#flash"))
+        )
+        assert "Your username is invalid!" in self.driver.page_source, "Error message not displayed!"
 
-def test_invalid_login(setup):
-    driver = setup
-    driver.get("http://the-internet.herokuapp.com/login")  # Navigate to login page
-    
-    wait = WebDriverWait(driver, 10)
-    wait.until(EC.presence_of_element_located((By.ID, "username")))  # Wait for username field
-
-    logger.info("Entering invalid username and password.")
-    driver.find_element(By.ID, "username").send_keys("invalidUser")
-    driver.find_element(By.ID, "password").send_keys("wrongPassword")
-    driver.find_element(By.CSS_SELECTOR, "button[type='submit']").click()
-
-    wait.until(EC.presence_of_element_located((By.XPATH, "//div[contains(text(), 'Your username is invalid!')]")))  # Wait for error message
-    assert "Your username is invalid!" in driver.page_source, "Error message not displayed!"  # Check for error message
+# Run the tests
+if __name__ == "__main__":
+    test = TestLogin()
+    test.setup_method()
+    try:
+        test.test_valid_login()
+        test.test_invalid_login()
+    finally:
+        test.teardown_method()
