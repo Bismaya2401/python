@@ -1,67 +1,42 @@
+import pytest
+import logging
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.chrome.service import Service as ChromeService
-from selenium.webdriver.chrome.options import Options
-import logging
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-class TestLogin:
-    def setup_method(self):
-        options = Options()
-        options.add_argument("--headless")  # Run Chrome in headless mode
-        options.add_argument("--no-sandbox")  # Required for some environments
-        options.add_argument("--disable-dev-shm-usage")  # Overcome limited resource problems
+@pytest.fixture
+def setup():
+    service = Service(ChromeDriverManager().install())
+    options = webdriver.ChromeOptions()
+    driver = webdriver.Chrome(service=service, options=options)
+    driver.get("http://the-internet.herokuapp.com/login")
+    yield driver
+    driver.quit()
 
-        self.driver = webdriver.Chrome(service=ChromeService(), options=options)  # Initialize the WebDriver
-        self.driver.get("http://the-internet.herokuapp.com/login")  # Load the login page
+def test_valid_login(setup, caplog):
+    driver = setup
+    logger.info("Entering valid username and password.")
+    driver.find_element(By.ID, "username").send_keys("tomsmith")
+    driver.find_element(By.ID, "password").send_keys("SuperSecretPassword!")
+    driver.find_element(By.CSS_SELECTOR, "button[type='submit']").click()
+    assert "Secure Area" in driver.page_source, "Login failed!"
+    logger.info("Login successful.")
 
-    def teardown_method(self):
-        if self.driver:
-            self.driver.quit()  # Close the browser after each test
+def test_invalid_login(setup, caplog):
+    driver = setup
+    logger.info("Entering invalid username and password.")
+    driver.find_element(By.ID, "username").send_keys("invalidUser")
+    driver.find_element(By.ID, "password").send_keys("wrongPassword")
+    driver.find_element(By.CSS_SELECTOR, "button[type='submit']").click()
+    assert "Your username is invalid!" in driver.page_source, "Error message not displayed!"
+    logger.info("Error message displayed for invalid login.")
 
-    def test_valid_login(self):
-        logger.info("Entering valid username and password.")
-        self.driver.find_element(By.ID, "username").send_keys("tomsmith")
-        self.driver.find_element(By.ID, "password").send_keys("SuperSecretPassword!")
-        self.driver.find_element(By.CSS_SELECTOR, "button[type='submit']").click()
-        
-        # Wait for the "Secure Area" header to be present after login
-        try:
-            WebDriverWait(self.driver, 10).until(
-                EC.presence_of_element_located((By.TAG_NAME, "h2"))
-            )
-            assert "Secure Area" in self.driver.page_source, "Login failed! Secure Area not found."
-            logger.info("Login succeeded.")
-        except Exception as e:
-            logger.error(f"Error during valid login test: {e}")
+    # Capture log output for the report
+    for message in caplog.text.splitlines():
+        logger.info(message)
 
-    def test_invalid_login(self):
-        logger.info("Entering invalid username and password.")
-        self.driver.find_element(By.ID, "username").send_keys("invalid_user")
-        self.driver.find_element(By.ID, "password").send_keys("invalid_password")
-        self.driver.find_element(By.CSS_SELECTOR, "button[type='submit']").click()
-        
-        # Wait for the error message to be displayed
-        try:
-            WebDriverWait(self.driver, 10).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, "#flash"))
-            )
-            assert "Your username is invalid!" in self.driver.page_source, "Error message not displayed!"
-            logger.info("Invalid login test passed.")
-        except Exception as e:
-            logger.error(f"Error during invalid login test: {e}")
-
-# Run the tests
-if __name__ == "__main__":
-    test = TestLogin()
-    test.setup_method()
-    try:
-        test.test_valid_login()
-        test.test_invalid_login()
-    finally:
-        test.teardown_method()
